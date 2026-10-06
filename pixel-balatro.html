@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>像素小丑牌 · PIXEL BALATRO</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; }
+  body {
+    background:#0b241e;
+    background-image:
+      radial-gradient(ellipse at 50% 40%, rgba(52,152,120,.25), transparent 65%),
+      repeating-linear-gradient(45deg, rgba(0,0,0,.06) 0 8px, transparent 8px 16px);
+    font-family:'Courier New', Courier, monospace;
+    color:#eaf5ef;
+    overflow-x:hidden;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  #crt {
+    pointer-events:none; position:fixed; inset:0; z-index:999;
+    background:
+      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.45) 100%),
+      repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 3px);
+  }
+  #app {
+    max-width:1220px; margin:0 auto; padding:14px 10px 26px;
+    display:flex; gap:12px; align-items:flex-start; min-height:100vh;
+  }
+
+  /* ---------- 面板通用 ---------- */
+  .panel-title {
+    font-weight:900; font-size:13px; letter-spacing:2px;
+    color:#0b241e; background:#8fd3b6;
+    display:inline-block; padding:3px 10px; margin-bottom:6px;
+    box-shadow:3px 3px 0 rgba(0,0,0,.45);
+  }
+  .box {
+    background:#114639;
+    border:3px solid #06231c;
+    box-shadow:0 0 0 3px #0a2e26, 4px 4px 0 rgba(0,0,0,.5);
+    padding:10px 12px; margin-bottom:12px;
+  }
+  .row { display:flex; justify-content:space-between; align-items:center; font-size:15px; margin:3px 0; }
+  .row b { font-size:17px; }
+  .gold { color:#f5b942; }
+  .blue-num { color:#4fc3e8; }
+  .red-num { color:#fe5f55; }
+
+  /* ---------- 布局三列 ---------- */
+  #col-left { width:196px; flex:none; }
+  #col-mid { flex:1; min-width:0; display:flex; flex-direction:column; }
+  #col-right { width:252px; flex:none; }
+
+  .slots { display:flex; gap:7px; flex-wrap:wrap; min-height:80px; margin-bottom:14px; }
+  .slot {
+    width:64px; height:88px;
+    background:rgba(0,0,0,.22);
+    border:3px dashed rgba(143,211,182,.25);
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:rgba(143,211,182,.3);
+  }
+  .joker {
+    width:64px; height:88px; position:relative;
+    border:3px solid #06231c; box-shadow:0 0 0 2px #0a2e26, 3px 3px 0 rgba(0,0,0,.5);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    cursor:pointer; transition:transform .08s;
+  }
+  .joker:hover { transform:translateY(-4px); }
+  .joker .g { font-size:30px; font-weight:900; text-shadow:2px 2px 0 rgba(0,0,0,.55); }
+  .joker .n { font-size:11px; font-weight:900; text-shadow:1px 1px 0 rgba(0,0,0,.7); }
+  .joker.pop { animation:pop .3s; z-index:5; }
+  .joker.sold { opacity:.25; filter:grayscale(1); }
+
+  #joker-info {
+    font-size:12px; line-height:1.5; min-height:66px;
+    background:rgba(0,0,0,.25); border:2px solid #0a2e26; padding:7px 8px; color:#bfe3d2;
+  }
+
+  .leftbtns { display:flex; gap:6px; margin-top:10px; }
+  .leftbtns .pxbtn { font-size:12px; padding:7px 8px; flex:1; }
+
+  /* ---------- 牌桌 ---------- */
+  #played-wrap {
+    min-height:172px; position:relative;
+    background:rgba(0,0,0,.16);
+    border:3px solid rgba(6,35,28,.8);
+    box-shadow:inset 0 0 24px rgba(0,0,0,.35);
+    display:flex; align-items:center; justify-content:center; padding:14px 0;
+  }
+  #played-wrap .placeholder { color:rgba(234,245,239,.14); font-size:15px; font-weight:900; letter-spacing:6px; }
+  #played-row { display:flex; }
+  #played-row .card { margin:0 -8px; }
+
+  #hand-label {
+    text-align:center; min-height:30px; margin:10px 0 6px;
+    font-weight:900; font-size:19px; letter-spacing:2px;
+    text-shadow:2px 2px 0 rgba(0,0,0,.6);
+  }
+  #hand-label .pv { color:#4fc3e8; }
+  #hand-label .pvx { color:#fe5f55; }
+
+  #hand-row { display:flex; justify-content:center; padding:34px 0 6px; min-height:190px; }
+  #hand-row .card { margin-left:-14px; }
+  #hand-row .card:first-child { margin-left:0; }
+
+  /* ---------- 扑克牌 ---------- */
+  .card {
+    width:88px; height:122px; flex:none;
+    background:#f6f1e3;
+    border:3px solid #1b1b26;
+    box-shadow:4px 4px 0 rgba(0,0,0,.5);
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:transform .1s;
+  }
+  .card .rank {
+    position:absolute; top:3px; left:6px;
+    font-size:26px; font-weight:900; line-height:1;
+  }
+  .card .suit-mini { position:absolute; top:31px; left:7px; font-size:15px; line-height:1; }
+  .card .suit-big { font-size:46px; }
+  .card.red { color:#d63a2f; }
+  .card.black { color:#23232f; }
+  #hand-row .card:hover { transform:translateY(-14px); z-index:3; }
+  .card.selected { transform:translateY(-26px); z-index:4; outline:4px solid #f5b942; outline-offset:-2px; }
+  .card.scoring { animation:pop .28s; z-index:6; }
+  .card.draw { animation:drawIn .25s; }
+  .card.debuffed::after {
+    content:'✕'; position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:52px; font-weight:900; color:rgba(140,30,30,.75);
+    background:rgba(20,20,25,.45); text-shadow:2px 2px 0 rgba(0,0,0,.4);
+  }
+  #played-row .card { cursor:default; }
+  #played-row .card.scoring { transform:translateY(-8px); }
+
+  @keyframes pop { 0%{transform:scale(1)} 45%{transform:scale(1.28)} 100%{transform:scale(1)} }
+  @keyframes drawIn { from{transform:translateY(46px); opacity:0} to{transform:translateY(0); opacity:1} }
+  @keyframes floatUp {
+    0% { transform:translate(-50%,0); opacity:1; }
+    100% { transform:translate(-50%,-40px); opacity:0; }
+  }
+  .float-txt {
+    position:absolute; left:50%; top:-6px; z-index:20;
+    font-size:20px; font-weight:900; white-space:nowrap;
+    text-shadow:2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+    animation:floatUp .8s forwards; pointer-events:none;
+  }
+
+  /* ---------- 按钮 ---------- */
+  .pxbtn {
+    font-family:inherit; font-weight:900; font-size:17px;
+    padding:10px 14px; cursor:pointer; color:#fff;
+    border:3px solid #05150f;
+    box-shadow:0 4px 0 #05150f, inset 0 -4px 0 rgba(0,0,0,.28);
+    text-shadow:2px 2px 0 rgba(0,0,0,.5);
+    letter-spacing:2px;
+  }
+  .pxbtn:active:not(:disabled) { transform:translateY(3px); box-shadow:0 1px 0 #05150f; }
+  .pxbtn.red { background:#e04a3f; }
+  .pxbtn.yellow { background:#e8a020; }
+  .pxbtn.blue { background:#2d7dd2; }
+  .pxbtn.green { background:#2e9e5b; }
+  .pxbtn:disabled { background:#4a5a55; color:#8a9a95; cursor:not-allowed; text-shadow:none; }
+  .big-btn { width:100%; margin-bottom:10px; font-size:21px; padding:13px; }
+  #btn-play { background:#e04a3f; }
+  #btn-play.armed { background:#2e9e5b; }
+
+  /* ---------- 右侧分数区 ---------- */
+  .blind-tag {
+    display:inline-block; font-weight:900; font-size:16px; padding:3px 12px;
+    border:3px solid #05150f; box-shadow:3px 3px 0 rgba(0,0,0,.45); margin-bottom:8px;
+    text-shadow:2px 2px 0 rgba(0,0,0,.5);
+  }
+  #boss-line { font-size:12px; color:#ffb0a8; margin-bottom:4px; min-height:15px; }
+  .score-box .chips-mult {
+    display:flex; align-items:center; justify-content:center; gap:10px; margin:8px 0;
+  }
+  .chips-mult .chips {
+    background:#0aa2c0; border:3px solid #05150f; box-shadow:0 3px 0 #05150f;
+    padding:6px 14px; font-size:26px; font-weight:900; min-width:96px; text-align:center;
+    text-shadow:2px 2px 0 rgba(0,0,0,.4);
+  }
+  .chips-mult .mult {
+    background:#fe5f55; border:3px solid #05150f; box-shadow:0 3px 0 #05150f;
+    padding:6px 14px; font-size:26px; font-weight:900; min-width:76px; text-align:center;
+    text-shadow:2px 2px 0 rgba(0,0,0,.4);
+  }
+  .chips-mult .x { font-size:26px; font-weight:900; text-shadow:2px 2px 0 #000; }
+  .score-line { text-align:center; font-size:16px; border-top:2px solid rgba(0,0,0,.3); padding-top:6px; }
+  #score-num { font-size:22px; }
+  #score-num.won { color:#7dff9e; }
+  .score-pop { animation:pop .3s; display:inline-block; }
+
+  /* ---------- 模态框 ---------- */
+  #overlay {
+    position:fixed; inset:0; z-index:100;
+    background:rgba(3,14,11,.75);
+    display:none; align-items:center; justify-content:center;
+  }
+  #overlay.show { display:flex; }
+  .modal {
+    background:#124637;
+    border:4px solid #06231c;
+    box-shadow:0 0 0 4px #0a2e26, 10px 10px 0 rgba(0,0,0,.55);
+    padding:26px 30px; max-width:780px; width:92%;
+    text-align:center; max-height:92vh; overflow:auto;
+  }
+  .modal h1 { font-size:34px; letter-spacing:4px; text-shadow:3px 3px 0 rgba(0,0,0,.55); margin-bottom:6px; }
+  .modal h2 { font-size:22px; letter-spacing:3px; text-shadow:2px 2px 0 rgba(0,0,0,.55); margin-bottom:10px; }
+  .modal .sub { color:#9fd8bd; font-size:14px; margin-bottom:18px; }
+  .blind-pick {
+    display:flex; gap:14px; justify-content:center; margin:16px 0 20px; flex-wrap:wrap;
+  }
+  .blind-card {
+    width:200px; padding:14px 10px; cursor:pointer;
+    border:3px solid #05150f; box-shadow:0 5px 0 #05150f, inset 0 -5px 0 rgba(0,0,0,.22);
+    transition:transform .08s; text-align:center;
+  }
+  .blind-card:hover { transform:translateY(-5px); }
+  .blind-card .bt { font-size:20px; font-weight:900; text-shadow:2px 2px 0 rgba(0,0,0,.5); letter-spacing:2px; }
+  .blind-card .tgt { font-size:22px; font-weight:900; margin:8px 0; text-shadow:2px 2px 0 rgba(0,0,0,.5); }
+  .blind-card .rew { font-weight:900; color:#f5b942; }
+  .blind-card .fx { font-size:12px; margin-top:8px; color:#ffe0dc; min-height:30px; }
+  .blind-card.small { background:#2d7dd2; }
+  .blind-card.big { background:#e8a020; }
+  .blind-card.boss { background:#c0392b; }
+  .blind-card.disabled { filter:grayscale(.85) brightness(.7); cursor:not-allowed; }
+  .blind-card.disabled:hover { transform:none; }
+
+  /* ---------- 商店 ---------- */
+  .shop-row { display:flex; gap:18px; justify-content:center; margin:18px 0; flex-wrap:wrap; }
+  .shop-item {
+    width:190px; padding:14px 10px;
+    background:#0e3a2f; border:3px solid #06231c; box-shadow:4px 4px 0 rgba(0,0,0,.5);
+  }
+  .shop-item .big-joker {
+    width:84px; height:110px; margin:0 auto 8px; position:relative;
+    border:3px solid #06231c; box-shadow:3px 3px 0 rgba(0,0,0,.5);
+    display:flex; align-items:center; justify-content:center; font-size:44px; font-weight:900;
+    text-shadow:2px 2px 0 rgba(0,0,0,.55);
+  }
+  .shop-item .jn { font-weight:900; font-size:17px; }
+  .shop-item .jd { font-size:12px; color:#a9d9c2; min-height:36px; margin:6px 0; line-height:1.4; }
+  .shop-item .pxbtn { font-size:15px; padding:7px 10px; }
+  .shop-btns { display:flex; gap:12px; justify-content:center; }
+
+  .joker-owned { display:inline-block; margin:4px; }
+  .win-detail { font-size:16px; line-height:2; margin:12px 0 18px; }
+  .win-detail b { color:#f5b942; }
+  .help-text { text-align:left; font-size:14px; line-height:1.9; color:#cfeadd; }
+  .help-text b { color:#f5b942; }
+  .help-text .k { color:#4fc3e8; font-weight:900; }
+
+  #title-logo {
+    font-size:44px; font-weight:900; letter-spacing:6px; margin:10px 0 4px;
+    color:#f5b942; text-shadow:4px 4px 0 #7a3b00, 8px 8px 0 rgba(0,0,0,.35);
+    animation:logoBob 2s infinite;
+  }
+  @keyframes logoBob { 0%,100%{transform:translateY(0) rotate(-1.5deg)} 50%{transform:translateY(-8px) rotate(1.5deg)} }
+  .cards-deco { font-size:30px; letter-spacing:4px; margin-bottom:12px; }
+  .cards-deco .r { color:#e05252; } .cards-deco .b { color:#23232f; text-shadow:1px 1px 0 #fff; }
+</style>
+</head>
+<body>
+<div id="crt"></div>
+<div id="app">
+  <aside id="col-left">
+    <div class="panel-title">小丑牌</div>
+    <div id="joker-slots" class="slots"></div>
+    <div class="panel-title">消耗品</div>
+    <div id="consume-slots" class="slots"></div>
+    <div id="joker-info">把鼠标悬停在小丑牌上查看效果<br>双击可半价卖出</div>
+    <div class="leftbtns">
+      <button id="btn-sort" class="pxbtn blue">排序:点数</button>
+      <button id="btn-help" class="pxbtn">帮助</button>
+    </div>
+  </aside>
+
+  <main id="col-mid">
+    <div id="played-wrap"><div id="played-row"></div></div>
+    <div id="hand-label"></div>
+    <div id="hand-row"></div>
+  </main>
+
+  <aside id="col-right">
+    <div class="box">
+      <span class="blind-tag" id="blind-tag">盲注</span>
+      <div id="boss-line"></div>
+      <div class="row"><span>目标分数</span><b id="target-num" class="red-num">0</b></div>
+      <div class="row"><span>过关奖励</span><b id="reward-num" class="gold">$0</b></div>
+    </div>
+    <div class="box score-box">
+      <div style="text-align:center;font-weight:900;font-size:18px;min-height:22px" id="hand-name2">—</div>
+      <div class="chips-mult">
+        <div class="chips" id="chips-num">0</div>
+        <div class="x">×</div>
+        <div class="mult" id="mult-num">0</div>
+      </div>
+      <div class="score-line">当前分数 <b id="score-num">0</b></div>
+    </div>
+    <div class="box">
+      <div class="row"><span>金钱</span><b id="money-num" class="gold">$0</b></div>
+      <div class="row"><span>出牌</span><b id="plays-num">0/0</b></div>
+      <div class="row"><span>弃牌</span><b id="discards-num">0/0</b></div>
+      <div class="row"><span>底注</span><b id="ante-num">1</b></div>
+    </div>
+    <button id="btn-play" class="pxbtn big-btn">出 牌</button>
+    <button id="btn-discard" class="pxbtn big-btn yellow">弃 牌</button>
+  </aside>
+</div>
+
+<div id="overlay"><div class="modal" id="modal-content"></div></div>
+
+<script>
+'use strict';
+/* ============================================================
+   像素小丑牌 · PIXEL BALATRO
+   玩法：选牌组成牌型，筹码 × 倍数 = 分数，达到盲注目标过关，
+   打完盲注进商店买小丑牌增强，撑过更多底注。
+   ============================================================ */
+
+// ---------- 基础数据 ----------
+const SUITS = {
+  s:{ch:'♠', name:'黑桃', color:'black'},
+  h:{ch:'♥', name:'红桃', color:'red'},
+  d:{ch:'♦', name:'方块', color:'red'},
+  c:{ch:'♣', name:'梅花', color:'black'},
+};
+const SUIT_ORDER = ['s','h','c','d'];
+const RANK_STR = {11:'J',12:'Q',13:'K',14:'A'};
+const rankStr = r => RANK_STR[r] || String(r);
+const cardChips = c => c.rank===14 ? 11 : (c.rank>=11 ? 10 : c.rank);
+const fmt = n => n.toLocaleString('en-US');
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+// 底注基础目标分（小盲为基准）
+const ANTE_BASE = [null, 300, 800, 2000, 5000, 11000, 20000, 34000, 52000, 80000, 140000, 220000];
+function anteBase(ante){
+  if (ante < ANTE_BASE.length) return ANTE_BASE[ante];
+  const last = ANTE_BASE.length-1;
+  return Math.floor(ANTE_BASE[last] * Math.pow(1.6, ante-last));
+}
+
+const HANDS = { // 名称:[筹码,倍数,计分张数描述]
+  high:{name:'高牌',chips:5,mult:1}, pair:{name:'对子',chips:10,mult:2},
+  two:{name:'两对',chips:20,mult:2}, trips:{name:'三条',chips:30,mult:3},
+  straight:{name:'顺子',chips:30,mult:4}, flush:{name:'同花',chips:35,mult:4},
+  full:{name:'葫芦',chips:40,mult:3}, four:{name:'四条',chips:60,mult:7},
+  sflush:{name:'同花顺',chips:100,mult:8}, royal:{name:'皇家同花顺',chips:100,mult:8},
+};
+
+// ---------- 小丑牌定义 ----------
+const JOKER_DEFS = [
+  {id:'poet', name:'诗人', glyph:'诗', color:'#7d5ba6', price:4, rarity:'common',
+   desc:'每次出牌 +4 倍数', onHand:r=>{r.mult+=4; return '+4 倍数';}},
+  {id:'walk', name:'步行者', glyph:'行', color:'#2c3e50', price:4, rarity:'common',
+   desc:'每次出牌 +15 筹码', onHand:r=>{r.chips+=15; return '+15 筹码';}},
+  {id:'fool', name:'愚者', glyph:'愚', color:'#6c3483', price:4, rarity:'common',
+   desc:'+40 筹码 +1 倍数', onHand:r=>{r.chips+=40; r.mult+=1; return '+40筹码+1倍';}},
+  {id:'greed', name:'贪婪', glyph:'贪', color:'#b3541e', price:5, rarity:'common',
+   desc:'每张计分的 ♦ +3 倍数', onCard:(r,c)=>{if(c.suit==='d'){r.mult+=3; return '+3 倍数';}}},
+  {id:'rage', name:'愤怒', glyph:'怒', color:'#1e8449', price:5, rarity:'common',
+   desc:'每张计分的 ♣ +12 筹码', onCard:(r,c)=>{if(c.suit==='c'){r.chips+=12; return '+12筹码';}}},
+  {id:'face', name:'宫廷脸', glyph:'K', color:'#2471a3', price:5, rarity:'common',
+   desc:'每张计分的 J/Q/K +30 筹码', onCard:(r,c)=>{if(c.rank>=11&&c.rank<=13){r.chips+=30; return '+30筹码';}}},
+  {id:'duo', name:'成双', glyph:'双', color:'#ca6f1e', price:5, rarity:'common',
+   desc:'出牌包含对子时 +8 倍数', onHand:r=>{if(r.hasPair){r.mult+=8; return '+8 倍数';}}},
+  {id:'tri', name:'三合一', glyph:'三', color:'#148f77', price:5, rarity:'common',
+   desc:'出牌包含三条时 +60 筹码', onHand:r=>{if(r.hasTrips){r.chips+=60; return '+60筹码';}}},
+  {id:'heart', name:'红心像', glyph:'心', color:'#c0392b', price:6, rarity:'common',
+   desc:'每张计分的 ♥ +2 倍数', onCard:(r,c)=>{if(c.suit==='h'){r.mult+=2; return '+2 倍数';}}},
+  {id:'late', name:'末班车', glyph:'末', color:'#5d6d7e', price:6, rarity:'common',
+   desc:'每回合首次出牌 +5 倍数', onHand:r=>{if(r.firstPlay){r.mult+=5; return '+5 倍数';}}},
+  {id:'grow', name:'抽象画', glyph:'画', color:'#34495e', price:7, rarity:'rare', perPlay:true,
+   desc:'+3 倍数，且每出一次牌永久 +3（可叠加）',
+   onHand:(r,j)=>{r.mult+=3*j.count; return '+'+(3*j.count)+' 倍数';}},
+  {id:'banana', name:'黄金蕉', glyph:'蕉', color:'#b7950b', price:8, rarity:'rare',
+   desc:'+12 倍数', onHand:r=>{r.mult+=12; return '+12 倍数';}},
+  {id:'mirror', name:'魔镜', glyph:'镜', color:'#117864', price:7, rarity:'rare',
+   desc:'打出同花时 倍数 ×2', onHand:r=>{if(r.isFlush){r.mult*=2; return '×2 倍数';}}},
+  {id:'king', name:'王权', glyph:'王', color:'#922b21', price:8, rarity:'rare',
+   desc:'打出四条/同花顺时 倍数 ×3', onHand:r=>{if(r.bigHand){r.mult*=3; return '×3 倍数';}}},
+];
+const JOKER_MAP = Object.fromEntries(JOKER_DEFS.map(d=>[d.id,d]));
+
+// ---------- 全局状态 ----------
+let uid = 0;
+const state = {
+  phase:'intro',          // intro / select / playing / shop / over
+  deck:[], hand:[], played:[],
+  selected:new Set(),
+  ante:1, money:4,
+  jokers:[],              // {id, count}
+  sortBy:'rank',
+  round:null,
+  bossSuit:null,          // 本底注 Boss 削弱的花色（若 boss）
+  animating:false,
+  maxScore:0,
+};
+
+function newDeck(){
+  const d=[];
+  for(const s of SUIT_ORDER) for(let r=2;r<=14;r++) d.push({id:++uid, rank:r, suit:s});
+  for(let i=d.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [d[i],d[j]]=[d[j],d[i]]; }
+  return d;
+}
+function drawTo(n){
+  while(state.hand.length<n && state.deck.length){
+    state.hand.push(state.deck.pop());
+  }
+}
+
+// ---------- 牌型判定 ----------
+function evaluate(cards){
+  const cnt={};
+  cards.forEach(c=>cnt[c.rank]=(cnt[c.rank]||0)+1);
+  const groups=Object.entries(cnt).map(([r,n])=>({r:+r,n})).sort((a,b)=>b.n-a.n||b.r-a.r);
+  const hasPair=groups.some(g=>g.n===2), hasTrips=groups.some(g=>g.n===3);
+  const flush = cards.length===5 && cards.every(c=>c.suit===cards[0].suit);
+  let straight=false, straightHigh=0;
+  if(cards.length===5){
+    const uniq=[...new Set(cards.map(c=>c.rank))].sort((a,b)=>a-b);
+    if(uniq.length===5){
+      if(uniq[4]-uniq[0]===4){ straight=true; straightHigh=uniq[4]; }
+      else if(uniq.join()==='2,3,4,5,14'){ straight=true; straightHigh=5; }
+    }
+  }
+  let key, scoring;
+  if(straight&&flush){ key = straightHigh===14?'royal':'sflush'; scoring=cards.slice(); }
+  else if(groups[0].n===4){ key='four'; scoring=cards.filter(c=>cnt[c.rank]===4); }
+  else if(groups[0].n===3&&hasPair){ key='full'; scoring=cards.filter(c=>cnt[c.rank]===3); }
+  else if(flush){ key='flush'; scoring=cards.slice(); }
+  else if(straight){ key='straight'; scoring=cards.slice(); }
+  else if(groups[0].n===3){ key='trips'; scoring=cards.filter(c=>cnt[c.rank]===3); }
+  else if(hasPair&&groups.filter(g=>g.n===2).length>=2){ key='two'; scoring=cards.filter(c=>cnt[c.rank]===2); }
+  else if(hasPair){ key='pair'; scoring=cards.filter(c=>cnt[c.rank]===2); }
+  else { key='high'; let hi=cards[0]; cards.forEach(c=>{if(c.rank>hi.rank)hi=c;}); scoring=[hi]; }
+  const h=HANDS[key];
+  return {
+    key, name:h.name, chips:h.chips, mult:h.mult, scoring,
+    hasPair, hasTrips, isFlush:flush,
+    bigHand: key==='four'||key==='sflush'||key==='royal',
+  };
+}
+
+// ---------- 音效（8-bit WebAudio） ----------
+let AC=null;
+function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function beep(f, d=0.08, type='square', v=0.12, when=0){
+  const a=ac(); if(!a) return;
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type; o.frequency.value=f;
+  const s=a.currentTime+when;
+  o.connect(g); g.connect(a.destination);
+  g.gain.setValueAtTime(v,s);
+  g.gain.exponentialRampToValueAtTime(0.001,s+d);
+  o.start(s); o.stop(s+d+0.03);
+}
+const sfxClick = ()=>beep(320,0.05,'square',0.08);
+const sfxScore = ()=>beep(420+Math.random()*420,0.06,'square',0.1);
+const sfxJoker = ()=>{beep(660,0.06,'square',0.1); beep(880,0.06,'square',0.08,0.05);};
+const sfxWin = ()=>{[523,659,784,1046].forEach((f,i)=>beep(f,0.12,'square',0.12,i*0.09));};
+const sfxLose = ()=>{beep(220,0.25,'sawtooth',0.14); beep(150,0.4,'sawtooth',0.14,0.18);};
+const sfxCash = ()=>{beep(880,0.05,'square',0.1); beep(1174,0.09,'square',0.1,0.05);};
+
+// ---------- 渲染 ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s);
+
+function cardHTML(c){
+  const su=SUITS[c.suit];
+  const deb = state.round && state.round.debuffSuit===c.suit ? ' debuffed':'';
+  return `<div class="card ${su.color}${deb}" id="card-${c.id}" data-id="${c.id}">
+    <div class="rank">${rankStr(c.rank)}</div>
+    <div class="suit-mini">${su.ch}</div>
+    <div class="suit-big">${su.ch}</div>
+  </div>`;
+}
+function jokerHTML(j, idx){
+  const d=JOKER_MAP[j.id];
+  return `<div class="joker" id="joker-${idx}" data-idx="${idx}" style="background:${d.color}">
+    <div class="g">${d.glyph}</div><div class="n">${d.name}</div>
+  </div>`;
+}
+function renderJokers(){
+  const slots=$('joker-slots');
+  let html='';
+  state.jokers.forEach((j,i)=>{ html+=jokerHTML(j,i); });
+  for(let i=state.jokers.length;i<5;i++) html+='<div class="slot">空</div>';
+  slots.innerHTML=html;
+  $('consume-slots').innerHTML='<div class="slot">空</div>';
+}
+function sortHand(){
+  if(state.sortBy==='rank'){
+    state.hand.sort((a,b)=> b.rank-a.rank || SUIT_ORDER.indexOf(a.suit)-SUIT_ORDER.indexOf(b.suit));
+  }else{
+    state.hand.sort((a,b)=> SUIT_ORDER.indexOf(a.suit)-SUIT_ORDER.indexOf(b.suit) || b.rank-a.rank);
+  }
+}
+function renderHand(newIds){
+  sortHand();
+  const row=$('hand-row');
+  row.innerHTML=state.hand.map(c=>{
+    let h=cardHTML(c);
+    if(newIds && newIds.has(c.id)) h=h.replace('class="card','class="card draw');
+    return h;
+  }).join('');
+  // selected 状态
+  state.hand.forEach(c=>{
+    if(state.selected.has(c.id)) $('card-'+c.id).classList.add('selected');
+  });
+  renderHandName();
+}
+function renderPlayed(){
+  $('played-row').innerHTML = state.played.map(cardHTML).join('');
+  if(!state.played.length){
+    $('played-row').innerHTML='<div class="placeholder">打 出 区</div>';
+  }
+}
+function previewEval(){
+  const sel=state.hand.filter(c=>state.selected.has(c.id));
+  if(!sel.length) return null;
+  return evaluate(sel);
+}
+function renderHandName(){
+  const el=$('hand-label'), el2=$('hand-name2');
+  const p=previewEval();
+  if(p){
+    el.innerHTML=`${p.name}　<span class="pv">${p.chips}</span> <span style="color:#fff">×</span> <span class="pvx">${p.mult}</span>`;
+    el2.innerHTML=`${p.name}`;
+  }else{
+    el.innerHTML=`<span style="color:rgba(234,245,239,.35)">选牌后显示牌型（最多 5 张）</span>`;
+    el2.textContent='—';
+  }
+}
+function renderPanel(){
+  const r=state.round;
+  if(r){
+    $('blind-tag').textContent = ({small:'小盲注',big:'大盲注',boss:'BOSS盲注'})[r.blindType];
+    $('blind-tag').style.background = ({small:'#2d7dd2',big:'#e8a020',boss:'#c0392b'})[r.blindType];
+    $('boss-line').textContent = r.blindType==='boss'
+      ? `【${SUITS[r.debuffSuit].ch}${SUITS[r.debuffSuit].name}恐惧】该花色不计分` : '';
+    $('target-num').textContent=fmt(r.target);
+    $('reward-num').textContent='$'+r.baseReward;
+    $('chips-num').textContent=fmt(r.chips);
+    $('mult-num').textContent=r.mult;
+    $('hand-name2').textContent = r.handName||'—';
+    $('score-num').textContent=fmt(r.score);
+    $('score-num').classList.toggle('won', r.score>=r.target && r.score>0);
+    $('plays-num').textContent=`${r.plays}/${r.playsMax}`;
+    $('discards-num').textContent=`${r.discards}/${r.discardsMax}`;
+  }
+  $('money-num').textContent='$'+state.money;
+  $('ante-num').textContent=state.ante;
+  $('btn-play').disabled = state.animating || !state.round || state.round.plays<=0;
+  $('btn-discard').disabled = state.animating || !state.round || state.round.discards<=0;
+  const sel=state.selected.size;
+  $('btn-play').textContent = sel?`出 牌 (${sel})`:'出 牌';
+  $('btn-discard').textContent = sel?`弃 牌 (${sel})`:'弃 牌';
+}
+function renderAll(newIds){ renderJokers(); renderHand(newIds); renderPlayed(); renderPanel(); }
+
+function floatText(el, text, color){
+  const s=document.createElement('span');
+  s.className='float-txt'; s.textContent=text; s.style.color=color;
+  el.appendChild(s);
+  setTimeout(()=>s.remove(),820);
+}
+function popCard(card){
+  const el=$('card-'+card.id);
+  if(!el) return;
+  el.classList.remove('scoring'); void el.offsetWidth; el.classList.add('scoring');
+}
+function popJoker(idx){
+  const el=$('joker-'+idx);
+  if(!el) return;
+  el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+}
+
+// ---------- 模态框 ----------
+function showModal(html){ $('modal-content').innerHTML=html; $('overlay').classList.add('show'); }
+function hideModal(){ $('overlay').classList.remove('show'); }
+
+function showIntro(){
+  state.phase='intro';
+  showModal(`
+    <div class="cards-deco"><span class="b">♠</span><span class="r">♥</span><span class="r">♦</span><span class="b">♣</span></div>
+    <div id="title-logo">像素小丑牌</div>
+    <div class="sub">PIXEL BALATRO — 像素风扑克肉鸽</div>
+    <div class="help-text" style="margin:0 auto 18px;max-width:520px">
+      · 点击手牌选择 <span class="k">1~5</span> 张，出牌构成牌型：<span class="k">筹码 × 倍数 = 分数</span><br>
+      · 分数达到盲注目标即过关，出牌次数用完仍未达标则游戏结束<br>
+      · 每打过一次盲注进入<span class="k">商店</span>，购买小丑牌增强实力<br>
+      · 底注每过一轮提升，BOSS 盲注会削弱一种花色<br>
+      · 双击小丑牌可半价卖出
+    </div>
+    <button class="pxbtn green" style="font-size:22px;padding:12px 40px" onclick="startRun()">开 始 游 戏</button>
+  `);
+}
+
+function startRun(){
+  ac(); // 激活音频
+  state.ante=1; state.money=4; state.jokers=[]; state.maxScore=0; state.sortBy='rank';
+  $('btn-sort').textContent='排序:点数';
+  showBlindSelect();
+}
+
+function showBlindSelect(){
+  state.phase='select';
+  state.round=null; state.played=[]; state.hand=[]; state.selected.clear();
+  renderAll();
+  const base=anteBase(state.ante);
+  const small=Math.floor(base*1), big=Math.floor(base*1.5), boss=Math.floor(base*2);
+  state.nextBossSuit = SUIT_ORDER[Math.floor(Math.random()*4)];
+  const bs=SUITS[state.nextBossSuit];
+  showModal(`
+    <h2>底注 ${state.ante} · 选择盲注</h2>
+    <div class="sub">打赢盲注获得金钱，难度递增，随时可以在商店强化</div>
+    <div class="blind-pick">
+      <div class="blind-card small" onclick="pickBlind('small')">
+        <div class="bt">小盲注</div>
+        <div class="tgt">${fmt(small)}</div>
+        <div class="rew">奖励 $3</div><div class="fx"></div>
+      </div>
+      <div class="blind-card big" onclick="pickBlind('big')">
+        <div class="bt">大盲注</div>
+        <div class="tgt">${fmt(big)}</div>
+        <div class="rew">奖励 $4</div><div class="fx"></div>
+      </div>
+      <div class="blind-card boss" onclick="pickBlind('boss')">
+        <div class="bt">BOSS盲注</div>
+        <div class="tgt">${fmt(boss)}</div>
+        <div class="rew">奖励 $5</div>
+        <div class="fx">【${bs.ch}${bs.name}恐惧】<br>${bs.name}不计分</div>
+      </div>
+    </div>
+  `);
+}
+
+function pickBlind(type){
+  if(state.animating) return;
+  sfxClick();
+  const base=anteBase(state.ante);
+  const mult={small:1,big:1.5,boss:2}[type];
+  const debuffSuit = type==='boss' ? state.nextBossSuit : null;
+  state.round={
+    blindType:type, target:Math.floor(base*mult),
+    score:0, chips:0, mult:0, handName:'',
+    plays:4, playsMax:4, discards:3, discardsMax:3,
+    baseReward:{small:3,big:4,boss:5}[type],
+    debuffSuit, firstPlayDone:false,
+  };
+  state.bossSuit=debuffSuit;
+  state.phase='playing';
+  state.deck=newDeck(); state.hand=[]; state.played=[]; state.selected.clear();
+  drawTo(8);
+  hideModal();
+  renderAll();
+}
+
+// ---------- 计分流程 ----------
+async function doPlay(){
+  if(state.animating||state.phase!=='playing') return;
+  const r=state.round;
+  const sel=state.hand.filter(c=>state.selected.has(c.id));
+  if(!sel.length||r.plays<=0) return;
+  state.animating=true; renderPanel();
+  state.selected.clear();
+  r.plays--; r.firstPlayDone = r.firstPlayDone || (r.plays===r.playsMax-1);
+  const ev=evaluate(sel);
+  state.hand=state.hand.filter(c=>!sel.includes(c));
+  state.played=sel;
+  r.handName=ev.name; r.chips=ev.chips; r.mult=ev.mult;
+  renderHand(); renderPlayed(); renderPanel();
+  beep(180,0.1,'square',0.1); beep(240,0.1,'square',0.1,0.08);
+  await sleep(380);
+
+  // 逐张计分
+  for(const card of ev.scoring){
+    if(r.debuffSuit && card.suit===r.debuffSuit){
+      popCard(card); sfxLose2();
+      const el=$('card-'+card.id); if(el) floatText(el,'无效','#c9c9c9');
+      await sleep(240); continue;
+    }
+    r.chips+=cardChips(card);
+    renderPanel();
+    popCard(card); sfxScore();
+    const el=$('card-'+card.id);
+    if(el) floatText(el,'+'+cardChips(card),'#4fc3e8');
+    // 计分触发的小丑
+    for(let i=0;i<state.jokers.length;i++){
+      const j=state.jokers[i], d=JOKER_MAP[j.id];
+      if(!d.onCard) continue;
+      const txt=d.onCard(r,card,j);
+      if(txt){
+        renderPanel(); popJoker(i); sfxJoker();
+        const je=$('joker-'+i);
+        if(je) floatText(je,txt, txt.includes('倍数')?'#fe5f55':'#4fc3e8');
+        await sleep(210);
+      }
+    }
+    await sleep(250);
+  }
+
+  // 出牌触发的小丑
+  r.hasPair=ev.hasPair; r.hasTrips=ev.hasTrips;
+  r.isFlush=ev.isFlush; r.bigHand=ev.bigHand;
+  r.firstPlay = (r.plays===r.playsMax-1); // 本回合第一次出牌
+  for(let i=0;i<state.jokers.length;i++){
+    const j=state.jokers[i], d=JOKER_MAP[j.id];
+    if(!d.onHand) continue;
+    const txt=d.onHand(r,j);
+    if(txt){
+      renderPanel(); popJoker(i); sfxJoker();
+      const je=$('joker-'+i);
+      if(je) floatText(je,txt, txt.includes('倍')?'#fe5f55':'#4fc3e8');
+      await sleep(280);
+    }
+  }
+  for(const j of state.jokers){ const d=JOKER_MAP[j.id]; if(d.perPlay) j.count++; }
+
+  // 结算
+  const total=Math.floor(r.chips*r.mult);
+  if(total>0) state.maxScore=Math.max(state.maxScore,total);
+  await rollScore(total);
+
+  // 补牌
+  const before=new Set(state.hand.map(c=>c.id));
+  drawTo(8);
+  const newIds=new Set(state.hand.filter(c=>!before.has(c.id)).map(c=>c.id));
+  state.played=[];
+  renderAll(newIds);
+  beep(300,0.05,'triangle',0.08);
+  await sleep(150);
+  state.animating=false; renderPanel();
+
+  if(r.score>=r.target){ await sleep(320); return winBlind(); }
+  if(r.plays<=0){ return gameOver(); }
+}
+function sfxLose2(){ beep(160,0.08,'sawtooth',0.06); }
+
+async function rollScore(to){
+  const r=state.round, el=$('score-num');
+  const from=r.score; r.score+=to;
+  const steps=Math.max(6,Math.min(18,Math.round(to/40)+6));
+  for(let i=1;i<=steps;i++){
+    el.textContent=fmt(Math.floor(from+(r.score-from)*i/steps));
+    el.classList.remove('score-pop'); void el.offsetWidth; el.classList.add('score-pop');
+    beep(500+i*30,0.03,'square',0.05);
+    await sleep(30);
+  }
+  el.classList.add('won');
+}
+
+async function doDiscard(){
+  if(state.animating||state.phase!=='playing') return;
+  const r=state.round;
+  const sel=state.hand.filter(c=>state.selected.has(c.id));
+  if(!sel.length||r.discards<=0) return;
+  state.animating=true; renderPanel();
+  state.selected.clear();
+  r.discards--;
+  state.hand=state.hand.filter(c=>!sel.includes(c));
+  const before=new Set(state.hand.map(c=>c.id));
+  drawTo(8);
+  const newIds=new Set(state.hand.filter(c=>!before.has(c.id)).map(c=>c.id));
+  renderAll(newIds);
+  beep(220,0.08,'sawtooth',0.1); beep(160,0.1,'sawtooth',0.08,0.06);
+  await sleep(220);
+  state.animating=false; renderPanel();
+}
+
+// ---------- 过关 / 失败 ----------
+function winBlind(){
+  sfxWin();
+  const r=state.round;
+  const playBonus=r.plays;
+  const interest=Math.min(5,Math.floor(state.money/5));
+  const gain=r.baseReward+playBonus+interest;
+  state.money+=gain;
+  state.phase='win';
+  const wasBoss=r.blindType==='boss';
+  showModal(`
+    <h2 style="color:#7dff9e">★ 盲注攻克 ★</h2>
+    <div class="sub">${({small:'小盲注',big:'大盲注',boss:'BOSS盲注'})[r.blindType]} 目标 ${fmt(r.target)} · 得分 ${fmt(r.score)}</div>
+    <div class="win-detail">
+      过关奖金 <b>$${r.baseReward}</b><br>
+      剩余出牌 ×$1 <b>$${playBonus}</b><br>
+      利息（每$5得$1，上限$5）<b>$${interest}</b><br>
+      合计入账 <b>$${gain}</b> · 现有 <b>$${state.money}</b>
+    </div>
+    <button class="pxbtn green" style="font-size:19px;padding:11px 30px" onclick="afterWin(${wasBoss})">前 往 商 店 →</button>
+  `);
+}
+function afterWin(wasBoss){
+  sfxClick();
+  if(wasBoss) state.ante++;
+  openShop();
+}
+
+function gameOver(){
+  sfxLose();
+  state.phase='over';
+  showModal(`
+    <h2 style="color:#fe5f55">游 戏 结 束</h2>
+    <div class="sub">出牌次数耗尽，未能达到盲注目标</div>
+    <div class="win-detail">
+      抵达底注 <b>${state.ante}</b><br>
+      单次最高得分 <b>${fmt(state.maxScore)}</b><br>
+      持有小丑牌 <b>${state.jokers.length}</b> 张
+    </div>
+    <button class="pxbtn green" style="font-size:19px;padding:11px 30px" onclick="startRun()">再 来 一 局</button>
+  `);
+}
+
+// ---------- 商店 ----------
+let shopStock=[], rerollCost=4;
+function randomJoker(exclude){
+  const pool=[];
+  for(const d of JOKER_DEFS){
+    if(exclude.has(d.id)) continue;
+    pool.push(...Array(d.rarity==='rare'?1:3).fill(d.id));
+  }
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function openShop(){
+  state.phase='shop';
+  rerollCost=4;
+  const ex=new Set();
+  shopStock=[randomJoker(ex)]; ex.add(shopStock[0]);
+  shopStock.push(randomJoker(ex));
+  renderShop(false);
+}
+function renderShop(rerolled){
+  const canBuy=state.jokers.length<5;
+  const items=shopStock.map((id,i)=>{
+    const sold = id===null;
+    const d = JOKER_MAP[id];
+    if(sold) return `<div class="shop-item">
+      <div class="big-joker" style="background:#20443a"></div>
+      <div class="jn">已售出</div>
+      <div class="jd"></div>
+      <button class="pxbtn" disabled>空 位</button>
+    </div>`;
+    return `<div class="shop-item">
+      <div class="big-joker" style="background:${d.color}">${d.glyph}</div>
+      <div class="jn">${d.name}</div>
+      <div class="jd">${d.desc}</div>
+      <button class="pxbtn green" ${(!canBuy||state.money<d.price)?'disabled':''} onclick="buyJoker(${i})">$ ${d.price}</button>
+    </div>`;
+  }).join('');
+  showModal(`
+    <h2 style="color:#f5b942">▼ 商 店 ▼</h2>
+    <div class="sub">金钱 $${state.money} · 小丑牌槽位 ${state.jokers.length}/5 ${canBuy?'':'（已满，可双击卖掉旧的）'}</div>
+    <div class="shop-row">${items}</div>
+    <div class="shop-btns">
+      <button class="pxbtn blue" ${state.money<rerollCost?'disabled':''} onclick="doReroll()">重 掷 $${rerollCost}</button>
+      <button class="pxbtn red" onclick="leaveShop()">前 往 底 注 ${state.ante} →</button>
+    </div>
+    ${rerolled?'':'<div class="sub" style="margin-top:12px">小丑牌效果在每次出牌时自动结算</div>'}
+  `);
+}
+function buyJoker(i){
+  const id=shopStock[i], d=JOKER_MAP[id];
+  if(!id||state.money<d.price||state.jokers.length>=5) return;
+  state.money-=d.price;
+  shopStock[i]=null;
+  state.jokers.push({id, count:1});
+  sfxCash();
+  renderJokers(); renderPanel();
+  renderShop(false);
+}
+function doReroll(){
+  if(state.money<rerollCost) return;
+  state.money-=rerollCost; rerollCost++;
+  const ex=new Set();
+  shopStock=[randomJoker(ex)]; ex.add(shopStock[0]);
+  shopStock.push(randomJoker(ex));
+  sfxClick();
+  renderJokers(); renderPanel();
+  renderShop(true);
+}
+function leaveShop(){
+  sfxClick();
+  showBlindSelect();
+}
+
+// ---------- 交互 ----------
+$('hand-row').addEventListener('click', e=>{
+  const el=e.target.closest('.card');
+  if(!el||state.animating||state.phase!=='playing') return;
+  const id=+el.dataset.id;
+  if(state.selected.has(id)){
+    state.selected.delete(id); el.classList.remove('selected');
+  }else{
+    if(state.selected.size>=5){ beep(140,0.08,'sawtooth',0.08); return; }
+    state.selected.add(id); el.classList.add('selected');
+  }
+  sfxClick();
+  renderHandName(); renderPanel();
+});
+$('joker-slots').addEventListener('mouseover', e=>{
+  const el=e.target.closest('.joker');
+  if(!el) return;
+  const j=state.jokers[+el.dataset.idx];
+  if(!j) return;
+  const d=JOKER_MAP[j.id];
+  let extra='';
+  if(d.perPlay) extra=`（当前 +${3*j.count} 倍数）`;
+  $('joker-info').innerHTML=`<b style="color:#f5b942">${d.name}</b>［${d.rarity==='rare'?'稀有':'普通'}］<br>${d.desc}${extra}<br><span style="color:#8a9a95">双击卖出 $${Math.floor(d.price/2)}</span>`;
+});
+$('joker-slots').addEventListener('dblclick', e=>{
+  const el=e.target.closest('.joker');
+  if(!el||state.animating) return;
+  const idx=+el.dataset.idx;
+  const j=state.jokers[idx];
+  if(!j) return;
+  const d=JOKER_MAP[j.id];
+  const val=Math.floor(d.price/2);
+  state.money+=val;
+  state.jokers.splice(idx,1);
+  sfxCash();
+  $('joker-info').innerHTML=`卖出了 <b>${d.name}</b>，获得 $${val}`;
+  renderJokers(); renderPanel();
+});
+$('btn-play').addEventListener('click', doPlay);
+$('btn-discard').addEventListener('click', doDiscard);
+$('btn-sort').addEventListener('click', ()=>{
+  state.sortBy = state.sortBy==='rank'?'suit':'rank';
+  $('btn-sort').textContent = state.sortBy==='rank'?'排序:点数':'排序:花色';
+  sfxClick(); renderHand();
+});
+$('btn-help').addEventListener('click', ()=>{
+  sfxClick();
+  showModal(`
+    <h2>玩法说明</h2>
+    <div class="help-text" style="margin:0 auto;max-width:560px">
+      <b>选牌</b>：点击手牌选 1~5 张（再点取消）<br>
+      <b>出牌</b>：构成扑克牌型，<span class="k">筹码 × 倍数</span> 逐张计入分数，达到目标立即过关<br>
+      <b>弃牌</b>：换掉不要的牌，每回合 3 次<br>
+      <b>牌型</b>：高牌 &lt; 对子 &lt; 两对 &lt; 三条 &lt; 顺子 &lt; 同花 &lt; 葫芦 &lt; 四条 &lt; 同花顺 &lt; 皇家同花顺<br>
+      <b>小丑牌</b>：出牌时自动触发加成，蓝色浮字加筹码、红色浮字加倍数；双击卖出<br>
+      <b>盲注</b>：小盲 1× / 大盲 1.5× / BOSS 2× 基础目标，BOSS 会禁用一种花色的计分<br>
+      <b>金钱</b>：过关奖金 + 剩余出牌奖励 + 利息（每 $5 得 $1，上限 $5）<br>
+      <b>过关奖励</b>：小盲 $3 / 大盲 $4 / BOSS $5
+    </div>
+    <div style="margin-top:16px">
+      <button class="pxbtn blue" onclick="hideModal()">返 回</button>
+    </div>
+  `);
+});
+window.hideModal=hideModal;
+
+// 自适应缩放
+function fit(){
+  const app=$('app');
+  const s=Math.min(1,(window.innerWidth-8)/1240);
+  app.style.zoom=s;
+}
+window.addEventListener('resize',fit); fit();
+
+// 暴露全局按钮回调
+window.startRun=startRun; window.pickBlind=pickBlind; window.afterWin=afterWin;
+window.buyJoker=buyJoker; window.doReroll=doReroll; window.leaveShop=leaveShop;
+
+// 启动
+showIntro();
+</script>
+</body>
+</html>
