@@ -19,3 +19,7 @@
 
 - 纯 HTML / CSS / JavaScript 单文件应用
 - Web Audio API 合成 8-bit 音效，CRT 滤镜纯 CSS 实现
+
+## 关注公众号
+
+![公众号二维码](qrcode.jpg)
